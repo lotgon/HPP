@@ -143,12 +143,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AMPHelper.h" />
+    <ClInclude Include="AMPMaxNegative.h" />
+    <ClInclude Include="CPUMaxNegative.h" />
     <ClInclude Include="Csv.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AMPHelper.cpp" />
+    <ClCompile Include="AMPMaxNegative.cpp" />
+    <ClCompile Include="CPUMaxNegative.cpp" />
     <ClCompile Include="Csv.cpp" />
     <ClCompile Include="MaxNegative.cpp" />
     <ClCompile Include="stdafx.cpp">

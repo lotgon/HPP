@@ -30,6 +30,12 @@
     <ClInclude Include="AMPHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AMPMaxNegative.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CPUMaxNegative.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -42,6 +48,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AMPHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AMPMaxNegative.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CPUMaxNegative.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
