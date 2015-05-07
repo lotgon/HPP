@@ -57,7 +57,7 @@ concurrency::completion_future CAMPMaxNegative::CalculateDrawdown(concurrency::a
 						isPointCalculated = true;
 						concurrency::atomic_fetch_inc(&calculatedCount);
 						D[t_idx.global] = maxDrawdown;
-						duration[t_idx.global] = 0;
+						duration[t_idx.global] = -1;
 						break;
 					}
 
@@ -77,7 +77,10 @@ concurrency::completion_future CAMPMaxNegative::CalculateDrawdown(concurrency::a
 
 		}
 	});
-	concurrency::completion_future complEvent = D.synchronize_async();
+	D.synchronize();
+	duration.synchronize();
+
+	concurrency::completion_future complEvent = duration.synchronize_async();
 	//std::wcout << "Finish GPU Calc" << std::endl;
 	return complEvent;
 }
