@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 
-#define TILE_SIZE 128
+#define TILE_SIZE 64
 
 
 CAMPMaxNegative::CAMPMaxNegative()
