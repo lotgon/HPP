@@ -11,7 +11,7 @@
 #include <fstream>
 #include <string>
 
-#define BLOCK_SIZE 128
+#define BLOCK_SIZE 32
 // This will output the proper CUDA error strings in the event that a CUDA host call returns an error
 template< typename T >
 void check(T result, char const *const func, const char *const file, int const line)
@@ -30,8 +30,29 @@ void check(T result, char const *const func, const char *const file, int const l
 
 
 __global__ void CalculateDrawdown(float *prices, float currTp, float *CalculateDrawdown, int *duration, int N)
-{
-	printf("[%d]:\t\tValue is\n", blockIdx.x*blockDim.x + threadIdx.x);
+{ 
+	int absTx = blockIdx.x*blockDim.x + threadIdx.x;
+	//printf("Result writing for %d", absTx);
+	if (absTx >= N)
+		return;
+
+	float threshold = prices[absTx] + currTp;
+	float openPrice = prices[absTx];
+	float drawdown = 0;
+	int step;
+	for (step = absTx; step < N ; step++)
+	{
+		if (openPrice - prices[step] > drawdown)
+			drawdown = openPrice - prices[step];
+
+		if (prices[step] >= threshold)
+			break;
+	}
+	CalculateDrawdown[absTx] = drawdown;
+	if (step < N)
+		duration[absTx] = step - absTx;
+	else
+		duration[absTx] = -1;
 }
 
 void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp)
@@ -56,7 +77,7 @@ void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std
 		checkCudaErrors(cudaMalloc((void**)&d_Drawdown, barCount*sizeof(float)));
 		checkCudaErrors(cudaMalloc((void**)&d_Duration, barCount*sizeof(int)));
 
-		dim3 dimGrid((barCount-1)/barCount + 1, 1, 1);
+		dim3 dimGrid((barCount-1)/BLOCK_SIZE + 1, 1, 1);
 		dim3 dimBlock(BLOCK_SIZE, 1, 1);
 		CalculateDrawdown<<<dimGrid, dimBlock>>>(d_P, currTp, d_Drawdown, d_Duration, barCount);
 

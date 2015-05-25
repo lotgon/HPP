@@ -66,7 +66,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	
 	float startTp = 0.5, endTp = 2., stepTp = 2.1;
-	bool IsWriteResult = true;
+	bool IsWriteResult = false;
 
 	///////////
 	//AMP
@@ -95,7 +95,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	sw1.stop();
 	std::wcout << "CPU Execution time is " << sw1.elapsed() / 1000 << " milliseconds";
 
-	std::wcin.get();
 	/////////////
 	//CUDA
 	/////////////
