@@ -65,7 +65,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		vectorDates.push_back(date1);
 	}
 	
-	float startTp = 0.5, endTp = 2., stepTp = 2.1;
+	float startTp = 0.5, endTp = 2., stepTp = 0.1;
 	bool IsWriteResult = false;
 
 	///////////

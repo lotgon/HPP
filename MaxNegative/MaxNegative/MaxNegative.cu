@@ -11,7 +11,8 @@
 #include <fstream>
 #include <string>
 
-#define BLOCK_SIZE 32
+#define BLOCK_SIZE 256
+#define TILE_SIZE 256
 // This will output the proper CUDA error strings in the event that a CUDA host call returns an error
 template< typename T >
 void check(T result, char const *const func, const char *const file, int const line)
@@ -29,7 +30,7 @@ void check(T result, char const *const func, const char *const file, int const l
 #define checkCudaErrors(val)           check ( (val), #val, __FILE__, __LINE__ )
 
 
-__global__ void CalculateDrawdown(float *prices, float currTp, float *CalculateDrawdown, int *duration, int N)
+__global__ void CalculateDrawdownSeq(float *prices, float currTp, float *CalculateDrawdown, int *duration, int N)
 { 
 	int absTx = blockIdx.x*blockDim.x + threadIdx.x;
 	//printf("Result writing for %d", absTx);
@@ -54,12 +55,64 @@ __global__ void CalculateDrawdown(float *prices, float currTp, float *CalculateD
 	else
 		duration[absTx] = -1;
 }
+__global__ void CalculateDrawdownTile(float *prices, float currTp, float *CalculateDrawdown, int *duration, int N)
+{
+	int absTx = blockIdx.x*blockDim.x + threadIdx.x;
+	int tx = threadIdx.x;
 
+	float maxDrawdown = 0;
+	float open = prices[absTx];
+	float threshold = open + currTp;
+
+	__shared__ float my_tile[TILE_SIZE];
+	__shared__ int calculatedCount;
+	calculatedCount = 0;
+
+	int stride = 0;
+	bool isPointCalculated = false;
+	__syncthreads();
+
+	for (; calculatedCount < TILE_SIZE; stride++)
+	{
+		int strideTile = stride *TILE_SIZE;
+		if (absTx + strideTile < N)
+			my_tile[tx] = prices[absTx + strideTile];
+		else
+			my_tile[tx] = 0;
+
+		__syncthreads();
+		if (!isPointCalculated)
+		{
+			for (int i = stride == 0 ? tx : 0; i < TILE_SIZE; i++)
+			{
+				if (strideTile + i + blockIdx.x * blockDim.x >= N)
+				{
+					isPointCalculated = true;
+					atomicAdd(&calculatedCount, 1);
+					CalculateDrawdown[absTx] = maxDrawdown;
+					duration[absTx] = -1;
+					break;
+				}
+
+				if (maxDrawdown < open - my_tile[i])
+					maxDrawdown = open - my_tile[i];
+				if (my_tile[i] >= threshold)
+				{
+					duration[absTx] = strideTile + i - tx;
+					CalculateDrawdown[absTx] = maxDrawdown;
+					isPointCalculated = true;
+					atomicAdd(&calculatedCount, 1);
+					break;
+				}
+			}
+		}
+		__syncthreads();
+	}
+}
 void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp)
 {
 	int barCount = prices.size();
 
-	//concurrency::array_view<float, 1> P(barCount, &prices[0]);
 	float *d_P;
 	checkCudaErrors(cudaMalloc((void**)&d_P, barCount*sizeof(float)));
 	checkCudaErrors(cudaMemcpy(d_P, &prices[0], barCount*sizeof(float), cudaMemcpyHostToDevice));
@@ -69,9 +122,6 @@ void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std
 	{
 		std::vector<float> vectorDrawdown(barCount);
 		std::vector<int> vectorDuration(barCount);
-		/*concurrency::array_view<float, 1> D(vectorDrawdown);
-		concurrency::array_view<int, 1> duration(vectorDuration);
-		*/
 		float *d_Drawdown;
 		int *d_Duration;
 		checkCudaErrors(cudaMalloc((void**)&d_Drawdown, barCount*sizeof(float)));
@@ -79,9 +129,9 @@ void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std
 
 		dim3 dimGrid((barCount-1)/BLOCK_SIZE + 1, 1, 1);
 		dim3 dimBlock(BLOCK_SIZE, 1, 1);
-		CalculateDrawdown<<<dimGrid, dimBlock>>>(d_P, currTp, d_Drawdown, d_Duration, barCount);
+		CalculateDrawdownTile<<<dimGrid, dimBlock>>>(d_P, currTp, d_Drawdown, d_Duration, barCount);
 
-		cudaDeviceSynchronize();
+		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(&vectorDrawdown[0], d_Drawdown, barCount*sizeof(float), cudaMemcpyDeviceToHost));
 		checkCudaErrors(cudaMemcpy(&vectorDuration[0], d_Duration, barCount*sizeof(int), cudaMemcpyDeviceToHost));
 
