@@ -14,8 +14,43 @@ CAMPMaxNegative::CAMPMaxNegative()
 CAMPMaxNegative::~CAMPMaxNegative()
 {
 }
+concurrency::completion_future CAMPMaxNegative::CalculateDrawdownSeq(concurrency::array_view<float, 1> prices, float currTp, concurrency::array_view<float, 1> &CalculateDrawdown, concurrency::array_view<int, 1> &duration)
+{
+	int N = prices.extent[0];
+	CalculateDrawdown.discard_data();
+	duration.discard_data();
+	parallel_for_each(prices.extent, [=](concurrency::index<1> t_idx) restrict(amp)
+	{
+		int absTx = t_idx[0];
 
-concurrency::completion_future CAMPMaxNegative::CalculateDrawdown(concurrency::array_view<float, 1> P, float tp, concurrency::array_view<float, 1> &D, concurrency::array_view<int, 1> &duration)
+		if (absTx >= N)
+			return;
+
+		float threshold = prices[absTx] + currTp;
+		float openPrice = prices[absTx];
+		float drawdown = 0;
+		int step;
+		for (step = absTx; step < N; step++)
+		{
+			if (openPrice - prices[step] > drawdown)
+				drawdown = openPrice - prices[step];
+
+			if (prices[step] >= threshold)
+				break;
+		}
+		CalculateDrawdown[absTx] = drawdown;
+		if (step < N)
+			duration[absTx] = step - absTx;
+		else
+			duration[absTx] = -1;
+	}
+	);
+
+	concurrency::completion_future complEvent = duration.synchronize_async();
+	return complEvent;
+
+}
+concurrency::completion_future CAMPMaxNegative::CalculateDrawdownTile(concurrency::array_view<float, 1> P, float tp, concurrency::array_view<float, 1> &D, concurrency::array_view<int, 1> &duration)
 {
 	int sz = P.extent[0];
 	D.discard_data();
@@ -84,7 +119,7 @@ concurrency::completion_future CAMPMaxNegative::CalculateDrawdown(concurrency::a
 	//std::wcout << "Finish GPU Calc" << std::endl;
 	return complEvent;
 }
-void CAMPMaxNegative::CalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp)
+void CAMPMaxNegative::CalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp, bool isTileMode=false)
 {
 	int barCount = prices.size();
 
@@ -97,7 +132,11 @@ void CAMPMaxNegative::CalculateAll(std::ofstream *outputFile, std::vector<float>
 		concurrency::array_view<float, 1> D(vectorDrawdown);
 		concurrency::array_view<int, 1> duration(vectorDuration);
 
-		CalculateDrawdown(P, currTp, D, duration).get();
+		if ( isTileMode)
+			CalculateDrawdownTile(P, currTp, D, duration).get();
+		else
+			CalculateDrawdownSeq(P, currTp, D, duration).get();
+
 		if ( outputFile != NULL)
 			for (int i = 0; i < barCount; i++)
 				*outputFile << vectorDates[i] << ", " << currTp<<", "<< vectorDrawdown[i] << ", " << vectorDuration[i] << "\n";

@@ -31,7 +31,7 @@ public:
 	}
 };
 
-extern void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp);
+extern void CudaCalculateAll(std::ofstream *outputFile, std::vector<float> &prices, std::vector<std::string> &vectorDates, float startTp, float endTp, float stepTp, bool tileMode);
 
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -69,45 +69,68 @@ int _tmain(int argc, _TCHAR* argv[])
 	bool IsWriteResult = false;
 
 	///////////
-	//AMP
+	//AMP Sequential
 	//////////
-	std::ofstream outputFile("..//Data//silverDayResult_AMP.csv");
-	outputFile << "Date, Tp, Drawdown,BarDuration\n";
-	Stopwatch<> sw0;
-	sw0.start();
+	std::ofstream outputFileAMPS("..//Data//silverDayResult_AMP_Seq.csv");
+	outputFileAMPS << "Date, Tp, Drawdown,BarDuration\n";
+	Stopwatch<> sw1;
+	sw1.start();
 	
-	CAMPMaxNegative::CalculateAll(IsWriteResult? &outputFile : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp);
+	CAMPMaxNegative::CalculateAll(IsWriteResult ? &outputFileAMPS: NULL, vectorPrices, vectorDates, startTp, endTp, stepTp, false);
 
-	sw0.stop();
-	std::wcout << "CAMP Execution time is " << sw0.elapsed()/1000 << " milliseconds";
+	sw1.stop();
+	std::wcout << "CAMP Sequential Execution time is " << sw1.elapsed()/1000 << " milliseconds"<<std::endl;
+	///////////
+	//AMP Parallel
+	//////////
+	std::ofstream outputFileAMPP("..//Data//silverDayResult_AMP_Parallel.csv");
+	outputFileAMPP << "Date, Tp, Drawdown,BarDuration\n";
+	sw1.start();
+
+	CAMPMaxNegative::CalculateAll(IsWriteResult ? &outputFileAMPP : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp, true);
+
+	sw1.stop();
+	std::wcout << "CAMP Parallel Execution time is " << sw1.elapsed() / 1000 << " milliseconds" << std::endl;
 
 	/////////////
 	//CPU
 	/////////////
-	std::ofstream outputFileCPU("..//Data//silverDayResult_CPU.csv");
-	outputFileCPU << "Date, Tp, Drawdown,BarDuration\n";
+	//std::ofstream outputFileCPU("..//Data//silverDayResult_CPU.csv");
+	//outputFileCPU << "Date, Tp, Drawdown,BarDuration\n";
 
-	Stopwatch<> sw1;
-	sw1.start();
+	//sw1.start();
 
-	CCPUMaxNegative::CalculateAll(IsWriteResult ? &outputFileCPU : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp);
+	//CCPUMaxNegative::CalculateAll(IsWriteResult ? &outputFileCPU : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp);
 
-	sw1.stop();
-	std::wcout << "CPU Execution time is " << sw1.elapsed() / 1000 << " milliseconds";
+	//sw1.stop();
+	//std::wcout << "CPU Execution time is " << sw1.elapsed() / 1000 << " milliseconds" << std::endl;
 
 	/////////////
-	//CUDA
+	//CUDA sequential
 	/////////////
-	std::ofstream outputFileCuda("..//Data//silverDayResult_Cuda.csv");
+	std::ofstream outputFileCuda("..//Data//silverDayResult_CudaSequential.csv");
 	outputFileCuda << "Date, Tp, Drawdown,BarDuration\n";
 
 	sw1.start();
 
-	CudaCalculateAll(IsWriteResult ? &outputFileCuda : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp);
+	CudaCalculateAll(IsWriteResult ? &outputFileCuda : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp, false);
 
 	sw1.stop();
-	std::wcout << "CPU Execution time is " << sw1.elapsed() / 1000 << " milliseconds";
+	std::wcout << "Cuda sequential Execution time is " << sw1.elapsed() / 1000 << " milliseconds" << std::endl;
+	/////////////
+	//CUDA tile
+	/////////////
+	std::ofstream outputFileCudaTile("..//Data//silverDayResult_CudaSequential.csv");
+	outputFileCudaTile << "Date, Tp, Drawdown,BarDuration\n";
 
+	sw1.start();
+
+	CudaCalculateAll(IsWriteResult ? &outputFileCudaTile : NULL, vectorPrices, vectorDates, startTp, endTp, stepTp, true);
+
+	sw1.stop();
+	std::wcout << "Cuda tile Execution time is " << sw1.elapsed() / 1000 << " milliseconds" << std::endl;
+
+	std::wcout << "Press any key to exit";
 	std::wcin.get();
 
 	return 0;
