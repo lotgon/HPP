@@ -18,7 +18,7 @@ namespace CudafyMaxNegative
     {
         static void Main(string[] args)
         {
-            List<double> pricesList = new List<double>();
+            List<float> pricesList = new List<float>();
             List<string> datesList = new List<string>();
 
             using( var streamReader = new System.IO.StreamReader(Settings1.Default.InputCsvFileName) )
@@ -28,7 +28,7 @@ namespace CudafyMaxNegative
                 while (csv.Read())
                 {
                     string header = csv.GetField<string>(0);
-                    double price = csv.GetField<double>(1);
+                    float price = csv.GetField<float>(1);
                     string dataTime = csv.GetField<string>(2);
 
                     pricesList.Add(price);
@@ -38,9 +38,10 @@ namespace CudafyMaxNegative
 
             using( StreamWriter sw = new StreamWriter(Settings1.Default.InputCsvFileName+"_Cudafy.csv"))
             {
+                sw.WriteLine("Date, Tp, Drawdown,BarDuration");
                 MeasureTime("GPGPU seq", 1, ()=>
                     {
-                        CalculateAll(null, pricesList.ToArray(), datesList.ToArray(), 0.5f, 2, 0.1);
+                        CalculateAll(null, pricesList.ToArray(), datesList.ToArray(), 0.5f, 2, 0.1f);
                     });
             }
 
@@ -49,7 +50,6 @@ namespace CudafyMaxNegative
         static GPGPU InitGPU()
         {
             CudafyModes.Target = eGPUType.OpenCL; // To use OpenCL, change this enum
-            CudafyModes.DeviceId = 0;
             CudafyTranslator.Language = CudafyModes.Target == eGPUType.OpenCL ? eLanguage.OpenCL : eLanguage.Cuda;
 
             int deviceCount = CudafyHost.GetDeviceCount(CudafyModes.Target);
@@ -57,6 +57,7 @@ namespace CudafyMaxNegative
             {
                 Console.WriteLine("No suitable {0} devices found.", CudafyModes.Target);
             }
+            CudafyModes.DeviceId = deviceCount-1;
             GPGPU gpu = CudafyHost.GetDevice(CudafyModes.Target, CudafyModes.DeviceId);
             Console.WriteLine("Running examples using {0}", gpu.GetDeviceProperties(false).Name);
 
@@ -68,26 +69,26 @@ namespace CudafyMaxNegative
         }
 
 
-        static void CalculateAll(StreamWriter sq, double[] prices, string[] dates, double startTp, double endTp, double stepTp)
+        static void CalculateAll(StreamWriter sq, float[] prices, string[] dates, float startTp, float endTp, float stepTp)
         {
             GPGPU gpu = InitGPU();
 
             int N = prices.Length;
-            double[] drawdown = new double[N];
+            float[] drawdown = new float[N];
             int[] duration = new int[N];
 
-            double[] dev_prices = gpu.Allocate<double>(prices);
-            double[] dev_drawdown = gpu.Allocate<double>(drawdown);
+            float[] dev_prices = gpu.Allocate<float>(prices);
+            float[] dev_drawdown = gpu.Allocate<float>(drawdown);
             int[] dev_duration= gpu.Allocate<int>(duration);
 
             gpu.CopyToDevice(prices, dev_prices);
 
-            for (double currTp = startTp; currTp <= endTp; currTp += stepTp)
+            for (float currTp = startTp; currTp <= endTp; currTp += stepTp)
             {
                 int BLOCK_SIZE = 32;
                 gpu.Launch((N - 1) / BLOCK_SIZE + 1, BLOCK_SIZE).calculate(dev_prices, currTp, N, dev_drawdown, dev_duration);
 
-                gpu.CopyFromDevice<double>(dev_drawdown, drawdown);
+                gpu.CopyFromDevice<float>(dev_drawdown, drawdown);
                 gpu.CopyFromDevice<int>(dev_duration, duration);
 
                 if( sq!= null)
@@ -101,7 +102,7 @@ namespace CudafyMaxNegative
             gpu.FreeAll();
         }
         [Cudafy]
-        public static void calculate(GThread gt, double[] prices, double currTp, int N, double[] drawdownArray, int[] durationArray)
+        public static void calculate(GThread gt, float[] prices, float currTp, int N, float[] drawdownArray, int[] durationArray)
         {
             int absTx = gt.blockIdx.x * gt.blockDim.x + gt.threadIdx.x;
 
@@ -109,9 +110,9 @@ namespace CudafyMaxNegative
                 return;
 
             //Console.WriteLine("blockIdx.x = " + gt.blockIdx.x.ToString());//  blockDim.x={1} threadIdx.x={2}", gt.blockDim.x, gt.threadIdx.x));
-            double threshold = prices[absTx] + currTp;
-            double openPrice = prices[absTx];
-            double drawdown = 0;
+            float threshold = prices[absTx] + currTp;
+            float openPrice = prices[absTx];
+            float drawdown = 0;
             int step;
             for (step = absTx; step < N && prices[step] < threshold ; step++)
             {
