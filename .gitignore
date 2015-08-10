@@ -1,0 +1,11 @@
+/MaxNegative/Debug
+/MaxNegative/MaxNegative.v12.suo
+*.obj
+*.tlog
+/MaxNegative/MaxNegative/Release
+/MaxNegative/MaxNegative/x64/Release
+/MaxNegative/MaxNegative/Debug
+/MaxNegative/Release
+/MaxNegative/x64/Release
+/MaxNegative/ipch/maxnegative-d7ab5c06/*.ipch
+/MaxNegative/MaxNegative/*.pdb
